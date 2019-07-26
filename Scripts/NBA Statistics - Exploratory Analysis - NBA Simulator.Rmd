@@ -1,0 +1,198 @@
+# NBA Advanced, Team per Game, and Team Opponent per Game Statistics - Exploratory Analysis - NBA Simulator Project: SIMPLE
+### Author: Patrick de Guzman
+
+# Executive Summary  
+
+# Loading the Data
+```{r}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, cache = TRUE)
+```
+
+
+```{r,warning=FALSE, message=FALSE}
+library(data.table)
+library(ggplot2)
+library(caret)
+```
+
+```{r}
+setwd("..")
+stats <- fread(file = "NBA Data by Team and Season.csv")
+head(stats, n = 10)
+```
+
+
+
+# Exploratory Data Analysis
+
+## W/L% Effect on Making Playoffs & Winning Championship
+```{r}
+par(mfrow = c(2,1))
+qplot(stats$`W/L%`, fill = stats$playoffs)
+qplot(stats$`W/L%`, fill = stats$champs)
+```
+```{r}
+WLbyPlayoffTeams <- summary(stats[stats$playoffs == TRUE]$`W/L%`)
+WLbyChampTeams <- summary(stats[stats$champs == TRUE]$`W/L%`)
+rbind(WLbyPlayoffTeams,WLbyChampTeams)
+```
+
+From this observation, the apparent 'cutoff' for making it into the playoffs is a W/L% of 0.439, and the 'cutoff' for being considered a contender at the championship is 0.634. However, to back this claim, we need to verify if these cutoffs don't change year over year (aka. that the distribution of W/L% is relatively the same across seasons). This will ensure that the average W/L% isn't, in fact, changing over time. To do this, we can examine the same histogram of W/L% but filled by season: 
+
+```{r}
+qplot(stats$`W/L%`, fill = stats$Season)
+```
+
+From the histogram above, we can conclude that the cutoffs we've set for making the playoffs and contending for a championship are valid since the W/L% distribution does not appear to be changing over time. 
+
+
+## Relative Prevalance of Different Metrics Season-by-season
+### Increase in Relative Pace of Game
+```{r}
+qplot(stats$Pace, fill = stats$Season)
+```
+
+```{r}
+qplot(stats$PTS,fill = stats$Season)
+```
+
+### 3-Point Era
+```{r}
+qplot(stats$`3PA`,fill = stats$Season)
+```
+
+```{r}
+qplot(stats$`2PA`,fill = stats$Season)
+```
+
+### eFG% by Season (w/ Champions per year)
+```{r}
+qplot(stats$`eFG%`, stats$Season, color = stats$champs)
+```
+
+```{r}
+qplot(substats$`eFG%`, substats$Season, color = substats$champs)
+```
+
+### Offensive Rating by Defensive Rating (w/ Playoff & Championship teams)
+
+```{r}
+qplot(stats$NRtg, stats$`W/L%`, color = stats$champs)
+```
+
+```{r}
+qplot(stats$ORtg, stats$DRtg, color = stats$playoffs)
+```
+
+```{r}
+qplot(stats$ORtg, stats$DRtg, color = stats$champs)
+```
+
+#### Results from Season-over-season analysis:  
+- W/L% cutoff for making playoffs = 0.439
+- W/L% cutoff for contending for a championship = 0.634
+- Observed increase in relative pace of games (and total points scored per game)
+- Observed increase in amount of 3-point shots attempted (along with decrease in 2-point shots attempted) = "3-point era"  
+
+
+## Advanced Statistics per Team  
+Additional feature is created in Net Rating "NRtg" = "ORtg" - "DRtg". This feature is suspected to be one of the variables with the highest impacts on W/L% as it takes into account both aspects of a team's game: Offense and defense.
+```{r}
+par(mfrow=c(2,1))
+pairs(stats[,c("W/L%","Pace","ORtg","DRtg","eFG%","TOV%", "NRtg")], lower.panel = NULL)
+pairs(stats[,c("W/L%","ORtg","DRtg","eFG%", "NRtg")], lower.panel = NULL)
+```
+
+Appears that from the advanced statistics, there exists a relationship between W/L% and the following variables: ORtg, DRtg, eFG%, NRtg.
+
+## Game Statistics
+```{r}
+par(mfrow=c(2,1))
+pairs(stats[,c("W/L%","2P","3P","FTA","ORB")], lower.panel = NULL)
+pairs(stats[,c("W/L%","DRB","AST","TOV","PTS")], lower.panel = NULL)
+```
+
+
+```{r}
+pairs(stats[,c("W/L%","AST","TOV","PTS")], lower.panel = NULL)
+```
+The variables that appear to have correlation with W/L% are: AST, TOV, and PTS.
+
+## Opponent Game Statistics
+
+```{r}
+par(mfrow=c(2,1))
+pairs(stats[,c("W/L%","OPP.2P","OPP.3P","OPP.FT")], lower.panel = NULL)
+pairs(stats[,c("W/L%","OPP.ORB","OPP.DRB","OPP.AST","OPP.TOV")], lower.panel = NULL)
+```
+
+Similar variables of interest (excluding OPP.TOV) appear when examining the opponent game statistics for each team. The variables that appear to have a relationship with W/L% are: OPP.DRB, and OPP.AST.
+
+## Analysis of Most Recent 5-year 'Era'
+
+```{r}
+substats <- stats[is.element(stats$Season,c("2018-19","2017-18","2016-17","2015-16","2014-15"))]
+unique(substats$Season)
+```
+
+```{r}
+par(mfrow=c(3,1))
+pairs(substats[,c("W/L%","ORtg","DRtg","eFG%", "NRtg")], lower.panel = NULL)
+pairs(substats[,c("W/L%","AST","TOV","PTS")], lower.panel = NULL)
+pairs(substats[,c("W/L%","OPP.DRB","OPP.AST","OPP.PTS")], lower.panel = NULL)
+```
+
+From our analysis of the features within the most recent 5 years of data, our conclusion stands with the following variables showing relationship to W/L%: 'ORtg' & 'DRtg' (and therefore, their net effect in 'NRtg'), eFG%, AST, PTS, OPP.DRB, OPP.AST, and OPP.PTS.  
+
+
+# Statistical Modelling
+
+## Analysis of Highly-Correlated Features
+```{r}
+correlations <- abs(cor(stats[,c("ORtg","DRtg","eFG%", "NRtg","AST","TOV","PTS","OPP.DRB","OPP.AST","OPP.PTS")]))
+diag(correlations) <- 0
+which(correlations > 0.80, arr.ind = TRUE)
+```
+
+Since nearly all of the features are highly-correlated, we will use Principal Components Analysis (PCA) when fitting a machine learning model to consolidate features (for use in our more-advanced simulation models). However, in our simple simulation, we will perform ANOVA analysis to determine a best-fit model.
+
+## Simple Linear Regression  
+
+Since Net Rating 'NRtg' was shown to have the strongest relationship to W/L%, we will use this single feature to predict W/L% (as well as the chances of a team making it into the playoffs and being considered a championship contender):
+```{r}
+fit <- lm(`W/L%` ~ NRtg, data = stats)
+summary(fit)
+```
+### Residual & Diagnostic Plots
+```{r}
+par(mfrow = c(2,2))
+plot(fit)
+```
+
+From the diagnostic plots, there doesn't appear to be any noticeable patterns that require us to troubleshoot the data. 
+
+Based on the simple linear regression model with 'NRtg' as the sole predictor, we have strong statistical evidence (p-value < 2e-16 and adjusted R-squared = 0.9437) that we should expect a 3.05868% increase in W/L% per every +1 increase in NRtg.  
+
+However, since NRtg is a result of both ORtg and DRtg (which are both a result of several other metrics), we fit a multivariable model to better explain the changes we should expect in W/L%.
+
+## Multivariable Regression
+### ANOVA Analysis 
+```{r}
+fit1 <- lm(`W/L%` ~ NRtg, data = stats)
+fit2 <- lm(`W/L%` ~ NRtg + ORtg + DRtg + `eFG%`, data = stats)
+fit3 <- lm(`W/L%` ~ NRtg + ORtg + DRtg + `eFG%` + AST + TOV + PTS, data = stats)
+fit4 <- lm(`W/L%` ~ NRtg + ORtg + DRtg + `eFG%` + AST + TOV + PTS + OPP.DRB + OPP.AST, data = stats)
+
+anova(fit1,fit2,fit3,fit4)
+```
+
+From the above, it appears that the addition of the variables in fit2 are not necessary for the model, but the addition of AST, TOV, and PTS from fit3 are since the Pr(>F) = 0.04621. Therefore, we will run the same ANOVA analysis but only using the additional variables in fit3 (AST, TOV, PTS): 
+
+```{r}
+fit1 <- lm(`W/L%` ~ NRtg, data = stats)
+fit4 <- lm(`W/L%` ~ NRtg + AST + TOV + PTS, data = stats)
+
+anova(fit1, fit4)
+```
+
+
