@@ -1,15 +1,53 @@
-# NBA Prediction Model: SIMPLE
-# Exploratory Data Analysis: NBA Advanced, Team per Game, and Team Opponent per Game Statistics
-#### Author: Patrick de Guzman
+---
+title: "Exploratory Data Analysis: NBA Advanced, Team per Game, and Team Opponent per Game Statistics"
+author: "Patrick de Guzman"
+date: "July 31, 2019"
+output: html_document
+---
+
+# Table of Contents
+\newline
+1. Executive Summary  
+2. Loading the Data    
+3. Exploratory Analysis    
+      + Exploring Traits of Winning Teams  
+            - Win/Loss % Distribution  
+            - Offensive & Defensive Ratings  
+            - Margin of Victory: Balance within the League  
+            - Strength of Schedule: Luck factor?  
+            - Correlations: Advanced Stats  
+            - Correlations: Team Game Stats  
+            - Correlations: Opponent Team Game Stats  
+            - Correlations: Recent 5-year Era  
+      + League Analysis: Select Metrics Season-by-Season  
+            - League Pace & Points  
+            - 3-point Era  
+            - eFG% by Season  
+4. Conclusion
 
 # Executive Summary  
+\newline
+      The following exploratory data analysis report was performed on an NBA dataset of [advanced](https://www.basketball-reference.com/play-index/tsl_finder.cgi?request=1&match=single&type=advanced&year_min=1981&lg_id=NBA&order_by=year_id), [team per game](https://www.basketball-reference.com/play-index/tsl_finder.cgi?request=1&match=single&type=team_per_game&year_min=1981&lg_id=NBA&order_by=year_id), and [opponent team per game](https://www.basketball-reference.com/play-index/tsl_finder.cgi?request=1&match=single&type=opp_per_game&year_min=1981&lg_id=NBA&order_by=year_id) statistics gathered from the [Basketball Reference](https://www.basketball-reference.com/) site. The data collected covered performance metrics from the regular season in the NBA spanning the years 1980-2019 (as years prior to this, several metrics were missing/not calculated or recorded).  
+
+\newline
+      Using this data, exploratory analysis was performed to understand the traits of winning teams, as well as pinpoint trends occuring in the league year over year. In this case, 'winning teams' were defined as those teams qualifying for the playoffs (and subsequently, those teams that eventually went on to become NBA champions).  
+
+\newline
+      To measure a team's success more closely, Win/Loss % (W/L%) was used as an estimator and several metrics were explored to determine if some metrics were stronger predictors of W/L% than others.  
+      Our findings suggest that a team's regular season Net Rating (i.e., a function of Offensive Rating, less Defensive Rating) had the highest correlation to a team's W/L%. In addition, the apparent cutoff W/L% to be considered a championship contender floated around the 0.65 W/L% mark. Championship teams also tend to show high margins of victory (MOV) during the regular season. For playoff-qualifying teams, a below-average strength of schedule (SOS) was observed, suggesting that there may be a 'luck' factor involved in determining winning teams (since a lower SOS indicates an 'easier' game schedule).  
+      Across the league, we also observe an increase in relative pace of game (and total points scored per game) from the 2000s to current date (2019). A portion of this increase in total points per game can be attributed to the league's increased reliance on the 3-point shot (and subsequently, the league's decreased reliance on the 2-point shot, indicated by total 3-point and 2-point shots attempted season over season).  
+
+\newline
+*From these findings, we will build 2 versions of an NBA simulator:  *  
+\newline
+      1. First, a **simple linear model** using the most suitable feature to predict W/L%. With this model, we will then forecast the feature values in coming years for each team, fit these forecasts on our linear model, and obtain an estimate for W/L%. By ranking teams based on their predicted W/L%, we obtain a prediction of the NBA's next championship team (2019-2020 season) and qualifying playoff contenders.  
+      2. Next, an **advanced & interactive predictor model** with the end goal of being able to incoporate team rosters and the effect of player trades on predicted team performance. This model will contain an advanced regression model to fit W/L% based on each player's performance & contributions. By increasing the granularity of our model to incorporate player contributions, we can then adjust a team's overall predicted performance by 'trading' players to other teams (and, therefore, moving their contributions to other teams). This granularity will allow our model to account for major player acquisitions/losses that occur each season which should increase our prediction success. 
 
 
 # Loading the Data
 ```{r, echo = FALSE}
-knitr::opts_chunk$set(message = FALSE, warning = FALSE, cache = TRUE)
+knitr::opts_chunk$set(cache = TRUE)
 ```
-
 ## Loading Required Libraries
 ```{r,warning=FALSE, message=FALSE}
 library(data.table)
@@ -21,42 +59,41 @@ library(forecast)
 
 ## Loading NBA Data by Team and Season
 
-For this report, we will load the "NBA Data by Team and Season.csv" file created from the "Data Collection and Cleaning.R" script: 
+For this report, we will load the "NBA Data by Team and Season.csv" file created from the "Data Collection and Cleaning.R" script:
 
 ```{r}
 setwd("..")
 stats <- fread(file = "NBA Data by Team and Season.csv")
-head(stats, n = 10)
-```
-
-Prior to our analysis, a few key column names will be adjusted to enable greater ease of use and readability: 
-```{r}
 names(stats)[names(stats) == "ADV.W.L."] <- "W.L"
 names(stats)[names(stats) == "ADV.playoffs"] <- "playoffs"
 names(stats)
 ```
 
+Each variable is outlined within the README file found in the [NBA Simulator repository](https://github.com/Patrickdg/NBA-Simulator---Simple-Model). The procedure for obtaining, cleaning, and consolidating the data can also be found in the README file. 
+
+
 # Exploratory Data Analysis
+## Exploring Traits of Winning Teams
 
-# Exploring Traits of Winning Teams
-To fit a regression model on the data and build predictions on a team's chances of making the playoffs and contending for a championship, we will explore the data to identify possible features consistent in winning teams. We define 'winning teams' as those with a Win/Loss % (W/L%) high enough to have made the playoffs. Within this set, we define 'championship contending teams' as those with a Win/Loss % within the 'championship cut-off' range which we will discuss in the next section. 
+      To fit a regression model on the data and build predictions on a team's chances of making the playoffs and contending for a championship, we will explore the data to identify possible features consistent in winning teams. We define 'winning teams' as those with a Win/Loss % (W/L%) high enough to have made the playoffs. Within this set, we define 'championship contending teams' as those with a Win/Loss % within the 'championship cut-off' range which we will discuss in the next section. 
 
+\newline
 We will also identify trends within the league (across seasons) to identify how the play-style within the NBA has evolved through the years as this will affect the weighting of certain features in our regression model when developing a more advanced predictor.  
 However, for the purposes of our inital 'simple' model, we will fit a simple linear regression using the single feature that we find most predictive of team W/L%. 
 
-## W/L% Distribution: Making Playoffs & Winning a Championship
+### Win/Loss % Distribution: Making Playoffs & Winning a Championship
 
 To identify if there is a cutoff for being considered a championship contender, we can plot the distribution of the W/L% of playoff teams and color the distribution of the championship teams (see 'Win/Loss % of Playoff Teams' histogram below).
 
+
 ```{r}
-par(mfrow = c(1,2))
-playoff.plot <- qplot(stats$W.L, fill = stats$playoffs, xlab = "Win/Loss %", 
-                      ylab = "Count (Teams)", main = "Win/Loss % Distribution" , binwidth = 0.05)
+playoffplot <- qplot(stats$W.L, fill = stats$playoffs, xlab = "W/L%", 
+                     ylab = "Count (Teams)", binwidth = 0.05)
 
 playoffdata <-stats[stats$playoffs == TRUE] ## create subset of playoff-only observations
-champ.plot <- qplot(playoffdata$W.L, binwidth = 0.05, fill = playoffdata$champs, 
-                    xlab = "Win/Loss %", ylab = "Count (Teams)", main = "Win/Loss % of Playoff Teams")
-grid.arrange(playoff.plot,champ.plot, nrow = 1)
+champsplot <- qplot(playoffdata$W.L, fill = playoffdata$champs, xlab = "W/L%",
+                    ylab = "Count (Teams)", binwidth = 0.05)
+grid.arrange(playoffplot, champsplot, nrow = 1)
 ```
 
 ```{r}
@@ -69,22 +106,28 @@ rbind(WLbyAllTeams, WLbyPlayoffTeams,WLbyChampTeams)
 From the playoff histogram on the right, it appears that in order to be considered a championship contending team, W/L% must be atleast in the top half of the distribution of W/L%'s across playoff teams. To support this insight, we need to verify if these cutoffs remain static year over year (aka. that the distribution of W/L% is relatively the same across seasons). This will ensure that the average W/L% isn't, in fact, changing over time. To do this, we can examine the same distributions of W/L% but by season: 
 
 ```{r}
-qplot(stats$ADV.Season, stats$W.L, geom = c("boxplot"), ylab = "W/L% Distribution", xlab = "Season (2000-01 to 2018-19)")
+qplot(stats$ADV.Season, stats$W.L, geom = c("boxplot"), 
+      ylab = "W/L% Distribution", xlab = "Season (2000-01 to 2018-19)")
 ```
 
 From the histogram above, we can conclude that the cutoff we've set to contend for a championship is valid since the W/L% distribution does not appear to be changing season by season.  
 
-## Offensive & Defensive Rating
-A factor that we'd like to examine is the (offensive)[https://en.wikipedia.org/wiki/Offensive_rating] and (defensive)[https://en.wikipedia.org/wiki/Defensive_rating] ratings of teams. These ratings provide a measure of a team's performance on both sides of the court and incorporate calculations using player points, field-goal percentage, total possessions, fouls, free-throws, rebounds, turnovers, blocks, and steals. By netting the 2 off (i.e., Offensive Rating, less Defensive Rating), we obtain a team's 'Net Rating' which is a higher-level view of a team's overall performance. 
+### Offensive & Defensive Rating
+\newline
+      A factor that we'd like to examine is the [offensive](https://en.wikipedia.org/wiki/Offensive_rating) and [defensive](https://en.wikipedia.org/wiki/Defensive_rating) ratings of teams. These ratings provide a measure of a team's performance on both sides of the court and incorporate calculations using player points, field-goal percentage, total possessions, fouls, free-throws, rebounds, turnovers, blocks, and steals. By netting the 2 off (i.e., Offensive Rating, less Defensive Rating), we obtain a team's 'Net Rating' which is a comprehensive view of a team's performance. 
 
 Similar to the histograms we created above, we can plot the distribution of Offensive (ORtg) and Defensive Ratings (DRtg) and fill by playoff and non-playoff teams:
 
 ```{r}
-ORtg.hist <- qplot(stats$ADV.ORtg, fill = stats$playoffs, xlab = "Offensive Rating", ylab = "Count (Teams)")
-ORtg.box <- qplot(stats$playoffs, stats$ADV.ORtg, geom = c("boxplot"), xlab = "Made Playoffs?", ylab = "Offensive Rating")
+ORtg.hist <- qplot(stats$ADV.ORtg, fill = stats$playoffs, 
+                   xlab = "Offensive Rating", ylab = "Count (Teams)")
+ORtg.box <- qplot(stats$playoffs, stats$ADV.ORtg, geom = c("boxplot"), 
+                  xlab = "Made Playoffs?", ylab = "Offensive Rating")
 
-DRtg.hist <- qplot(stats$ADV.DRtg, fill = stats$playoffs, xlab = "Defensive Rating", ylab = "Count (Teams)")
-DRtg.box <- qplot(stats$playoffs, stats$ADV.DRtg, geom = c("boxplot"), xlab = "Made Playoffs?", ylab = "Defensive Rating")
+DRtg.hist <- qplot(stats$ADV.DRtg, fill = stats$playoffs, 
+                   xlab = "Defensive Rating", ylab = "Count (Teams)")
+DRtg.box <- qplot(stats$playoffs, stats$ADV.DRtg, geom = c("boxplot"), 
+                  xlab = "Made Playoffs?", ylab = "Defensive Rating")
 
 grid.arrange(ORtg.hist,ORtg.box, DRtg.hist, DRtg.box,nrow = 2, ncol = 2)
 ```
@@ -104,10 +147,12 @@ grid.arrange(qplot(stats$ADV.ORtg, stats$W.L, geom = c("point"), color = stats$p
              nrow = 2)
 ```
 
-From these plots, it's clear that both metrics of ORtg and DRtg are good indicators of playoff and non-playoff teams. Below, hypothesis tests are performed to verify that the differences in mean ORtg and DRtg between playoff and non-playoff teams are statistically significant:
+From these plots, it's clear that both metrics of ORtg and DRtg are sufficient indicators of playoff and non-playoff teams. Below, hypothesis tests are performed to verify that the differences in mean ORtg and DRtg between playoff and non-playoff teams are statistically significant:
 
 ```{r}
-t.test(stats$ADV.ORtg[stats$playoffs == TRUE],stats$ADV.ORtg[stats$playoffs == FALSE], paired = FALSE)
+t.test(stats$ADV.ORtg[stats$playoffs == TRUE],
+       stats$ADV.ORtg[stats$playoffs == FALSE], 
+       paired = FALSE)
 ```
 
 Based on the results (p-value < 2.2e-16), there is statistically significant evidence that the true difference in means between the groups is not equal to 0 and, therefore, offensive ratings are higher (i.e., more favorable) in those teams that make it to the playoffs.  
@@ -115,7 +160,9 @@ Based on the results (p-value < 2.2e-16), there is statistically significant evi
 Statistical significance is also observed in the test for the difference in mean defensive ratings between the groups: 
 
 ```{r}
-t.test(stats$ADV.DRtg[stats$playoffs == TRUE],stats$ADV.DRtg[stats$playoffs == FALSE], paired = FALSE)
+t.test(stats$ADV.DRtg[stats$playoffs == TRUE],
+       stats$ADV.DRtg[stats$playoffs == FALSE], 
+       paired = FALSE)
 ```
 
 Therefore, defensive ratings are lower (i.e., more favorable) in those teams that make it to the playoffs.
@@ -141,13 +188,15 @@ t.test(playoffdata$ADV.NRtg[playoffdata$champs == TRUE],
 
 From the hypothesis test performed on the difference in the mean NRtg of championship playoff teams vs. non-championship playoff teams, the p-value = 6.779e-14 is statistically significant. Therefore, we have evidence to suggest that NRtg is higher in championship teams. 
 
-## Margin-of-Victory (MOV): Measure of Balance Across the League
-
-The Margin-of-victory (MOV) statistic is a measure of how large a team's wins are on average (in points). For example, a team with an MOV of 12 points states that on average, that team wins against their opponents by 12 points. As such, this statistic can be viewed as a measure of how balanced the league is (across teams) since an unbalanced league (i.e., a league with NBA superstars collecting in select teams) would show high variability in MOV. On the other hand, a balanced league would show less variable MOV with average values around 0 (if all teams are highly-competitive with one another with no specific teams dominating the rest). To analyze this, we can first plot 
+### Margin-of-Victory (MOV): Measure of Balance Across the League
+\newline
+      The Margin-of-victory (MOV) statistic is a measure of how large a team's wins are on average (in points). For example, a team with an MOV of 12 points states that on average, that team wins against their opponents by 12 points. As such, this statistic can be viewed as a measure of how balanced the league is (across teams) since an unbalanced league (i.e., a league with NBA superstars collecting in select teams) would show high variability in MOV. On the other hand, a balanced league would show less variable MOV with average values around 0 (if all teams are highly-competitive with one another and no specific teams dominating the rest). To analyze this, we plot the distribution of MOV in playoff teams vs. non-playoff teams (boxplot), as well as the distribution in championship vs. non-championship teams (histogram). 
 
 ```{r}
-MOV.box <- qplot(stats$playoffs, stats$ADV.MOV, geom = c("boxplot"), xlab = "Made Playoffs?", ylab = "MOV")
-MOVchamps.hist <- qplot(stats$ADV.MOV, fill = stats$champs, xlab = "MOV", ylab = "Count (Teams)")
+MOV.box <- qplot(stats$playoffs, stats$ADV.MOV, geom = c("boxplot"), 
+                 xlab = "Made Playoffs?", ylab = "MOV")
+MOVchamps.hist <- qplot(stats$ADV.MOV, fill = stats$champs, 
+                        xlab = "MOV", ylab = "Count (Teams)")
 
 grid.arrange(MOV.box, MOVchamps.hist,
              nrow = 1)
@@ -158,15 +207,18 @@ From the above, the championship teams reside approximately in the top quarter q
 By graphing the MOV distributions by year, we can get a sense of how the balance in the league has changed over time:
 
 ```{r}
-MOVbySeason.box <- qplot(stats$ADV.Season, stats$ADV.MOV, geom = c("boxplot")); MOVbySeason.box
+MOVbySeason.box <- qplot(stats$ADV.Season, stats$ADV.MOV, 
+                         geom = c("boxplot")); MOVbySeason.box
 ```
 
-The seasons with longer bars indicate higher variability (and therefore, higher imbalance) across teams in those leagues. Season over season, it appears that in recent years, the league's MOV distribution has been fairly stable and slightly less variable over time, suggesting that the league is trending towards a more balanced composition of teams (i.e., less teams 'dominating' the league).
+The seasons with longer bars indicate higher variability (and therefore, higher imbalance) across teams in those leagues. It appears that in 2007-2008, there was a spike in MOV variation. However, in recent years, the league's MOV distribution has been fairly stable and slightly less variable over time, suggesting that the league is trending towards a more balanced composition of teams (i.e., less teams 'dominating' the league, fewer 'superteams' hoarding allstar rosters).
 
 Since we know that MOV is, on average, higher in teams that make the playoffs as opposed to non-playoff teams, we can also perform a hypothesis test between the difference in the mean MOV of championship playoff teams vs. non-championship playoff teams: 
 
 ```{r}
-MOVtest <- t.test(playoffdata$ADV.MOV[stats$champs == TRUE],playoffdata$ADV.MOV[stats$champs == FALSE], paired = FALSE)
+MOVtest <- t.test(playoffdata$ADV.MOV[stats$champs == TRUE],
+                  playoffdata$ADV.MOV[stats$champs == FALSE], 
+                  paired = FALSE)
 MOVtest
 ```
 ```{r}
@@ -175,25 +227,31 @@ MOVtest$p.value
 
 From the large p-value = 0.6635701, we do not have statistically significant evidence to suggest that the difference in mean MOV between champions and non-championship playoff teams is not equal to 0. Therefore, MOV may not be a reliable feature when predicting championship teams out of the pool of playoff teams. 
 
-## Strength of Schedule (SOS): Luck an Important Factor? 
-Another variable we will visit is the Strength-of-schedule (SOS) metric which is a measure of the difficulty in a team's schedule. Although there is variability in (how this metric is calculated)[https://www.nbastuffer.com/analytics101/strength-of-schedule-sos/], the following are typical variables: 
+### Strength of Schedule (SOS): Luck an Important Factor? 
+\newline
+      Another variable we will visit is the Strength-of-schedule (SOS) metric which is a measure of the difficulty in a team's schedule. Although there is variability in [how this metric is calculated](https://www.nbastuffer.com/analytics101/strength-of-schedule-sos/), the following are typical variables:  
+\newline
 - Opponent proficiency  
 - Road trip length, back-to-back game schedules, and game locations  
 - Home-court advantages  
 - Game times (mornings/afternoons/evenings)  
 
-For the purposes of this analysis, we will use the SOS ratings calculated by 'Basketball Reference' (i.e., the source of our NBA data).  
+For the purposes of this analysis, we will use the SOS ratings calculated by [Basketball Reference](https://www.basketball-reference.com/about/glossary.html).  
 By analyzing SOS, we're looking to see if various factors of a team's schedule (and therefore, luck) plays a role in determining playoff or non-playoff status.  
 
 ```{r}
-SOS.hist <- qplot(stats$ADV.SOS, fill = stats$playoffs, xlab = "SOS", ylab = "Count (Teams)")
-SOS.box <- qplot(stats$playoffs, stats$ADV.SOS, geom = c("boxplot"), xlab = "Made Playoffs?", ylab = "SOS")
+SOS.hist <- qplot(stats$ADV.SOS, fill = stats$playoffs, 
+                  xlab = "SOS", ylab = "Count (Teams)")
+SOS.box <- qplot(stats$playoffs, stats$ADV.SOS, geom = c("boxplot"), 
+                 xlab = "Made Playoffs?", ylab = "SOS")
 
 grid.arrange(SOS.hist, SOS.box, nrow = 1)
 ```
 
 ```{r}
-SOStest <- t.test(stats$ADV.SOS[stats$playoffs == TRUE],stats$ADV.SOS[stats$playoffs == FALSE], paired = FALSE); SOStest
+SOStest <- t.test(stats$ADV.SOS[stats$playoffs == TRUE],
+                  stats$ADV.SOS[stats$playoffs == FALSE], 
+                  paired = FALSE); SOStest
 ```
 
 From the above hypothesis test, we see that the mean SOS is, in fact, lower in teams that qualify for the playoffs. Therefore, it appears that there is a luck factor involved since teams that qualify for the playoffs have easier-than-average schedules. 
@@ -202,73 +260,19 @@ From the above hypothesis test, we see that the mean SOS is, in fact, lower in t
 - Mean Margin of Victory (MOV) appears to be higher in the teams that make the playoffs. However, the mean MOV for winning (i.e., playoff) teams was only 3.11 points (meaning that on average, winning teams were only winning by about 3.11 points), suggesting that there may be a stronger effect from luck and the SOS than expected on team success.   
 - In the teams that make the playoffs, the mean Strength of Schedule (SOS) is lower compared to the non-qualifying group, suggesting that there is a material amount of 'luck' involved in determining 'winning' teams. Therefore, when developing an advanced regression model for predicting winning teams, a 'noise' factor will be added to simulate this 'luck' that we're observing from the SOS metric (random noise will be incorporated since the SOS cannot be forecasted as it is randomly determined).
 
-## Relative Prevalance of Different Metrics Season-by-season
-The next section aims to highlight changes in the overall league season-by-season to examine changes in play-style and the relative importance of various metrics. 
-
-### Increase in Relative Pace of Game
-```{r}
-SeasonPace.plot <- qplot(stats$ADV.Season, stats$ADV.Pace, geom = c("boxplot"),
-                         xlab = "Season (2000-01 to 2018-19)", ylab = "Pace")
-SeasonPTS.plot <- qplot(stats$ADV.Season, stats$TM.PTS, geom = c("boxplot"),
-                        xlab = "Season (2000-01 to 2018-19)", ylab = "Pts. per Game")
-
-grid.arrange(SeasonPace.plot, SeasonPTS.plot, nrow = 1)
-```
-
-From plotting both Pace and Pts Per Game (PTS) by season, we observe a downward trend during the earlier years of the league between 1980-2000 followed by an upward trend towards faster-paced games in more recent years (i.e., greater number of possessions/shorter possession times).
-
-```{r}
-qplot(stats$W.L, stats$ADV.Pace)
-```
-
-However, no clear relationship exists between Pace and Win/Loss %. 
-
-### 3-Point Era
-From plotting both 3-point shots and 2-point shots attempted by season, we see a clear trend in the league for greater reliance on the 3-point shot which explains some of the increase in average total points scored season-by-season. 
-
-```{r}
-qplot(stats$TM.3PA,fill = stats$ADV.Season, binwidth = 5, xlab = "3-Point Attempts", ylab = "Count (Teams)")
-```
-
-
-```{r}
-qplot(stats$TM.2PA,fill = stats$ADV.Season, binwidth = 7.5, xlab = "2-Point Attempts", ylab = "Count (Teams)")
-```
-
-
-### eFG% by Season (w/ Champions per year)
-Field-goal percentage is one measure of efficiency as it takes the total field-goals made and compare it to the total field-goals attempted. The Effective field-goal percentage (eFG%) adjusts for the fact that 3-point shots are more valuable than 2-point shots.  
-
-From the plot below, it appears that championship teams are generally more efficient (landing in the top majority) for a large number of the years in the dataset. 
-
-```{r}
-qplot(stats$ADV.eFG., stats$ADV.Season, color = stats$champs)
-```
-
-
-
-### Results from Season-over-season analysis:  
-From our analysis, we determine the following: 
-- The W/L% cutoff for contending for a championship ~ 0.65  
-- Championship teams exhibit higher Net Ratings from their regular season performance prior to the playoffs   
-- Championship teams also tend to show high MOVs during the regular season     
-- Season over season, it appears that in recent years, the league is trending towards a more balanced composition of teams (i.e., less teams 'dominating' the league)  
-- Luck may play a factor in a team's chances of qualifying for the playoffs as SOS appears to be lower (denoting easier schedules) in playoff teams vs. non-playoff teams  
-- Across the league, we observed an increase in relative pace of game (and total points scored per game) from the 2000s to now (2019)  
-- We also observed an increased reliance on the 3-point shot along with a decreased reliance on the 2-point shot (i.e., the '3-point era')  
-
-
-## Advanced Statistics per Team  
-Additional feature is created in Net Rating "NRtg" = "ORtg" - "DRtg". This feature is suspected to be one of the variables with the highest impacts on W/L% as it takes into account both aspects of a team's game: Offense and defense.
+### W/L% Correlation: Advanced Statistics per Team 
+Next, we will take a closer look at the correlations of specific metrics to W/L%: 
 ```{r}
 par(mfrow=c(2,1))
-pairs(stats[,c("W.L","ADV.Pace","ADV.ORtg","ADV.DRtg","ADV.eFG.","ADV.TOV.", "ADV.NRtg")], lower.panel = NULL)
-pairs(stats[,c("W.L","ADV.ORtg","ADV.DRtg","ADV.eFG.", "ADV.NRtg")], lower.panel = NULL)
+pairs(stats[,c("W.L","ADV.Pace","ADV.ORtg","ADV.DRtg","ADV.eFG.","ADV.TOV.", "ADV.NRtg")], 
+      lower.panel = NULL)
+pairs(stats[,c("W.L","ADV.ORtg","ADV.DRtg","ADV.eFG.", "ADV.NRtg")], 
+      lower.panel = NULL)
 ```
 
-Appears that from the advanced statistics, there exists a relationship between W/L% and the following variables: ORtg, DRtg, eFG%, NRtg.
+From the advanced statistics, it appears that there exists a relationship between W/L% and the following variables: **ORtg, DRtg, eFG%, NRtg**.
 
-## Game Statistics
+### W/L% Correlation: Game Statistics
 ```{r}
 par(mfrow=c(2,1))
 pairs(stats[,c("W.L","TM.2P","TM.3P","TM.FTA","TM.ORB")], lower.panel = NULL)
@@ -279,9 +283,10 @@ pairs(stats[,c("W.L","TM.DRB","TM.AST","TM.TOV","TM.PTS")], lower.panel = NULL)
 ```{r}
 pairs(stats[,c("W.L","TM.AST","TM.PTS")], lower.panel = NULL)
 ```
-The variables that appear to have correlation with W/L% are: AST and PTS.
 
-## Opponent Game Statistics
+From the above correlation plots, the variables that appear to have correlation with W/L% are: **AST and PTS**.
+
+### W/L% Correlation: Opponent Game Statistics
 
 ```{r}
 par(mfrow=c(2,1))
@@ -289,17 +294,18 @@ pairs(stats[,c("W.L","OPP.2P","OPP.3P","OPP.FT")], lower.panel = NULL)
 pairs(stats[,c("W.L","OPP.ORB","OPP.DRB","OPP.AST","OPP.TOV")], lower.panel = NULL)
 ```
 
-Similar variables of interest (excluding OPP.TOV) appear when examining the opponent game statistics for each team. The variables that appear to have a relationship with W/L% are: OPP.DRB, and OPP.AST. However, these relationships don't appear to be as pronounced as the ones examined from the ADV and TM variables. 
+Similar variables of interest (excluding OPP.TOV) appear when examining the opponent game statistics for each team. The variables that appear to have a relationship with W/L% are: **OPP.DRB, and OPP.AST**. *However, these relationships don't appear to be as pronounced as the ones examined from the ADV and TM variables*. 
 
 ```{r}
 pairs(stats[,c("W.L","OPP.DRB","OPP.AST")], lower.panel = NULL)
 ```
 
 
-## Analysis of Most Recent 5-year 'Era'
-
+### W/L% Correlation: Analysis of Most Recent 5-year Period
+To account for the effect of possible changes across the league in recent years (e.g., pace of game, total points scored, 3-point era, etc.), we will also view the same statistics spanning across the most recent 5-year period:
 ```{r}
-substats <- stats[is.element(stats$ADV.Season,c("2018-19","2017-18","2016-17","2015-16","2014-15"))]
+substats <- stats[is.element(stats$ADV.Season,c("2018-19","2017-18","2016-17",
+                                                "2015-16","2014-15"))]
 unique(substats$ADV.Season)
 ```
 
@@ -310,75 +316,79 @@ pairs(substats[,c("W.L","TM.AST","TM.TOV","TM.PTS")], lower.panel = NULL)
 pairs(substats[,c("W.L","OPP.DRB","OPP.AST","OPP.PTS")], lower.panel = NULL)
 ```
 
-From our analysis of the features within the most recent 5 years of data, our conclusion stands with the following variables showing relationship to W/L%: 'ORtg' & 'DRtg' (and therefore, their net effect in 'NRtg'), eFG%, AST, PTS, OPP.DRB, OPP.AST, and OPP.PTS.  
+#### Results from Correlation Analysis
+From our analysis of the features within the most recent 5 years of data, our conclusion stands with the following variables showing relationship to W/L%: **'ORtg' & 'DRtg' (and therefore, their net effect in 'NRtg'), eFG%, AST, PTS, OPP.DRB, OPP.AST, and OPP.PTS**.  
+However, statistical analysis will be performed on these features to determine if these relationships are significant *(performed in our 'Simple Linear Model' documentation)*. 
 
+## League Analysis: Select Metrics Season-by-season
+\newline
+      The next section of analysis aims to highlight changes in the overall league season-by-season to examine changes in play-style and the relative importance of various metrics. 
 
-# Statistical Modelling
-
-## Analysis of Highly-Correlated Features
+### Increase in Relative Pace of Game
 ```{r}
-correlations <- abs(cor(stats[,c("ADV.ORtg","ADV.DRtg","ADV.eFG.", "ADV.NRtg","TM.AST","TM.TOV","TM.PTS","OPP.DRB","OPP.AST","OPP.PTS")]))
-diag(correlations) <- 0
-which(correlations > 0.75, arr.ind = TRUE)
+SeasonPace.plot <- qplot(stats$ADV.Season, stats$ADV.Pace, geom = c("boxplot"),
+                         xlab = "Season (2000-01 to 2018-19)", ylab = "Pace")
+SeasonPTS.plot <- qplot(stats$ADV.Season, stats$TM.PTS, geom = c("boxplot"),
+                        xlab = "Season (2000-01 to 2018-19)", ylab = "Pts. per Game")
+
+grid.arrange(SeasonPace.plot, SeasonPTS.plot, nrow = 1)
 ```
-
-Since a few of the features are highly-correlated, we will use Principal Components Analysis (PCA) when fitting a machine learning model to consolidate features (for use in our more-advanced simulation models).  
-For the purposes of this simple model, we will use a simple linear regression to model a team's predicted W/L%, and using that prediction, we can estimate the probability of that team winning the NBA Championship. 
-
-## Simple Linear Regression  
-
-Since Net Rating 'NRtg' was shown to have the strongest relationship to W/L%, we will use this single feature to predict W/L% (as well as the chances of a team making it into the playoffs and being considered a championship contender):
-```{r}
-fit <- lm(W.L ~ ADV.NRtg, data = stats)
-summary(fit)
-```
-### Residual & Diagnostic Plots
-```{r}
-par(mfrow = c(2,2))
-plot(fit)
-```
-
-From the diagnostic plots, there doesn't appear to be any noticeable patterns that require us to troubleshoot the data. 
-
-Based on the simple linear regression model with 'NRtg' as the sole predictor, we have strong statistical evidence (p-value < 2e-16 and adjusted R-squared = 0.9413) that we should expect a 3.09822% increase in W/L% per every +1 increase in NRtg.  
-
-## Forecasting Net Rating (based on Historical Trends)
-In order to build predictions on which teams are most likely to win the upcoming season's NBA Championships, we need to estimate -heir W/L% by drawing from their forecasted Net Ratings for the coming years. 
-
-### Forecasting Net Ratings by Team
+\newline
+      From plotting both Pace and Pts Per Game (PTS) by season, we observe a downward trend during the earlier years of the league between 1980-2000, followed by an upward trend towards faster-paced games in more recent years (i.e., greater number of possessions/shorter possession times). However, no clear relationship exists between Pace and Win/Loss % (see scatterplot below).
 
 ```{r}
-NetRatingByTeam <- stats[,c("ADV.Tm","ADV.Season","ADV.NRtg")]
-SplitNRbyTeam <- split(NetRatingByTeam,NetRatingByTeam$ADV.Tm)
+qplot(stats$W.L, stats$ADV.Pace, xlab = "W/L%", ylab = "Pace")
 ```
+
+
+### 3-Point Era
+\newline
+      From plotting both 3-point shots and 2-point shots attempted by season, we see a clear trend in the league for greater reliance on the 3-point shot which explains some of the increase in average total points scored season-by-season. 
 
 ```{r}
-forecasts <- data.frame()
-
-for(i in 1:length(SplitNRbyTeam)){
-      Tm <- data.frame(SplitNRbyTeam[i])
-      NRtgcol <- paste0(Tm[1,1],".ADV.NRtg")
-      Seasoncol <- paste0(Tm[1,1],".ADV.Season")
-      Tm <- Tm[order(Tm[2], decreasing = FALSE),]; Tm <- tail(Tm, 7)
-      Ts <- ts(Tm[NRtgcol])
-      forecast <- data.frame(forecast(Ts, robust = TRUE), h = 1)[1,1]
-      forecast <- as.numeric(forecast)
-      forecasts <- rbind(forecasts, cbind(Tm[1,1],forecast))
-}
-forecasts$forecast <- as.numeric(as.character(forecasts$forecast))
-forecasts <- forecasts[order(forecasts$forecast, decreasing = TRUE),]
-names(forecasts) <- c("Tm", "ADV.NRtg")
+qplot(stats$TM.3PA,fill = stats$ADV.Season, binwidth = 5, 
+      xlab = "3-Point Attempts", ylab = "Count (Teams)")
 ```
 
-## Predicting W/L and Outcome of 2019-2020 Season
 
 ```{r}
-WLPredictions <- data.table(predict(fit, newdata = forecasts[2]))
-PlayoffSeeds <- forecasts[1:16,2]
-WLPredictions <- WLPredictions[,playoffs:= forecasts[2] == PlayoffSeeds]
-predictions <- cbind(forecasts,WLPredictions)
-names(predictions) <- make.names(c("Tm", "Forecasted NRtg", "Predicted W/L%", "playoffs"))
-
-predictions[1:16,]
+qplot(stats$TM.2PA,fill = stats$ADV.Season, binwidth = 7.5, 
+      xlab = "2-Point Attempts", ylab = "Count (Teams)")
 ```
+
+
+### eFG% by Season (w/ Champions per year)
+\newline
+      Field-goal percentage is one measure of efficiency as it takes the total field-goals made and compare it to the total field-goals attempted. The Effective field-goal percentage (eFG%) adjusts for the fact that 3-point shots are more valuable than 2-point shots.  
+
+From the plot below, it appears that championship teams are generally more efficient (landing in the top majority) for a large number of the years in the dataset. 
+
+```{r}
+qplot(stats$ADV.eFG., stats$ADV.Season, color = stats$champs, 
+      xlab = "eFG%", ylab = "Season")
+```
+
+
+
+#### Results from Winning team & Season-over-season Analysis:  
+
+From our analysis, we determine the following:  
+
+\newline
+- The **W/L% cutoff for contending for a championship ~ 0.65**  
+- **Championship teams exhibit higher Net Ratings** from their regular season performance prior to the playoffs   
+- Championship teams **also tend to show high MOVs** during the regular season  
+- There appears to be a **relationship between W/L% and the following features:** *'ORtg' & 'DRtg' (and therefore, their net effect in 'NRtg'), eFG%, AST, PTS, OPP.DRB, OPP.AST, and OPP.PTS*.  
+- Season over season, it appears that in recent years, the league is trending towards a **more balanced composition of teams** (i.e., less teams 'dominating' the league)  
+- Luck may play a factor in a team's chances of qualifying for the playoffs as **SOS appears to be lower (denoting easier schedules) in playoff teams** vs. non-playoff teams  
+- Across the league, we observed an **increase in relative pace of game** (and total points scored per game) from the 2000s to now (2019)  
+- We also observed an **increased reliance on the 3-point shot** along with a decreased reliance on the 2-point shot (i.e., the '3-point era')  
+
+# Conclusion: Approach for Simple Linear Model & Advanced Interactive Predictor
+From our findings, we determine the following for the approach concerning our predictor models:  
+
+\newline
+1. **Simple Linear Model**: From the list of features that appear to be correlated to W/L%, we will perform statistical testing to identify the variables suitable for our regression model. After determining these features and fitting a model, we will forecast the values of these variables to enable the prediction of team success based on their historical performance. As a result, we will obtain an ordered ranking of W/L% by team to determine our best predictions for the following year's NBA championship team and playoff contenders.  
+\newline
+2. **Advanced Interactive Predictor**: To obtain higher accuracy in our prediction model with the incorporation of roster and player trade effects, we will account for the league's increased reliance on the 3-point shot (for example, by weighting the trade of established 3-point shooters more heavily than trades involving 'big men' centers). By using roster data on performance contributions from each player, we will enable a system for 'transferring' these stats to other teams when trades occur, thereby, affecting both teams' chances for success within our advanced model.  
 
