@@ -6,7 +6,7 @@
 This NBA Simulator Project will contain several components:  
 - Getting, Wrangling, Compiling, and Cleaning the data ([Github](https://github.com/Patrickdg/NBA-Simulator---Simple-Model/blob/master/Scripts/Data%20Collection%20and%20Cleaning%20V2.R))  
 - Exploratory Data Analysis ([Rpubs](http://rpubs.com/patrickdg/NBAPredictorEDA))  
-- Multivariable Regression Model to Predict W/L% and 2019-2020 season results ([Rpubs to be updated]())  
+- Multivariable Regression Model to Predict W/L% and 2019-2020 season results ([Rpubs](http://rpubs.com/patrickdg/NBAPredictorRegressionModel))  
 - Advanced Model, Interactive Trade System to Incorporate Individual Player Stats (In Progress!)  
 
 The final goal of this project is to develop an advanced regression/ML model with interactivity through a Shiny app to allow for the dynamic movement of NBA players from team to team. By doing this, we can improve our prediction results by incorporating the effect that individual players have on the teams that they play for (since our multivariable model will be shown to base itself on the assumption that teams remain static, i.e., no trades/waivers/injuries/etc. occur throughout the forecast horizon).  
